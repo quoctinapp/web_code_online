@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Code Editor</title>
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/25/25231.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/material.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/htmlmixed/htmlmixed.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/edit/closetag.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/edit/closebrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/fold/foldcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/fold/foldgutter.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/fold/xml-fold.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/fold/brace-fold.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/fold/foldgutter.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="editor-panel">
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('html', event)">HTML</button>
+                <button class="tab" onclick="switchTab('css', event)">CSS</button>
+                <button class="tab" onclick="switchTab('js', event)">JavaScript</button>
+            </div>
+
+            <div class="editor-content">
+                <div class="codemirror-wrapper active" id="html-wrapper">
+                    <textarea id="html-editor"></textarea>
+                </div>
+                <div class="codemirror-wrapper" id="css-wrapper">
+                    <textarea id="css-editor"></textarea>
+                </div>
+                <div class="codemirror-wrapper" id="js-wrapper">
+                    <textarea id="js-editor"></textarea>
+                </div>
+            </div>
+
+            <div class="toolbar">
+                <button class="btn" onclick="runCode()">▶ Chạy Code</button>
+                <button class="btn" onclick="clearEditor()">🗑 Xóa</button>
+                <button class="btn" onclick="downloadCode()">💾 Tải xuống</button>
+                <div class="status">Sẵn sàng</div>
+            </div>
+        </div>
+
+        <div class="preview-panel">
+            <div class="preview-header">
+                Live Preview
+            </div>
+            <iframe id="preview" class="preview-iframe"></iframe>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'html';
+        let editors = {};
+
+        function initializeEditors() {
+            editors.html = CodeMirror.fromTextArea(document.getElementById('html-editor'), {
+                mode: 'htmlmixed',
+                theme: 'material',
+                lineNumbers: true,
+                autoCloseTags: true,
+                autoCloseBrackets: true,
+                foldGutter: true,
+                gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
+                indentUnit: 4,
+                tabSize: 4,
+                lineWrapping: true
+            });
+
+            editors.css = CodeMirror.fromTextArea(document.getElementById('css-editor'), {
+                mode: 'css',
+                theme: 'material',
+                lineNumbers: true,
+                autoCloseBrackets: true,
+                foldGutter: true,
+                gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
+                indentUnit: 4,
+                tabSize: 4,
+                lineWrapping: true
+            });
+
+            editors.js = CodeMirror.fromTextArea(document.getElementById('js-editor'), {
+                mode: 'javascript',
+                theme: 'material',
+                lineNumbers: true,
+                autoCloseBrackets: true,
+                foldGutter: true,
+                gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
+                indentUnit: 4,
+                tabSize: 4,
+                lineWrapping: true,
+                smartIndent: true,
+                electricChars: false
+            });
+
+            Object.keys(editors).forEach(key => {
+                editors[key].on('change', function() {
+                    clearTimeout(editors[key].autoRunTimeout);
+                    editors[key].autoRunTimeout = setTimeout(runCode, 500);
+                });
+            });
+        }
+
+        function switchTab(tab, event) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.codemirror-wrapper').forEach(e => e.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tab + '-wrapper').classList.add('active');
+            
+            currentTab = tab;
+            
+            setTimeout(() => {
+                editors[tab].refresh();
+            }, 100);
+        }
+
+        function runCode() {
+            const htmlCode = editors.html.getValue();
+            const cssCode = editors.css.getValue();
+            const jsCode = editors.js.getValue();
+            const preview = document.getElementById('preview');
+            const previewDocument = preview.contentDocument || preview.contentWindow.document;
+
+            const fullCode = `
+                ${htmlCode}
+                <style>${cssCode}</style>
+                <script>
+                ${jsCode}
+                <\/script>
+            `;
+
+            previewDocument.open();
+            previewDocument.write(fullCode);
+            previewDocument.close();
+
+            const match = htmlCode.match(/<title>(.*?)<\/title>/i);
+            const title = match ? match[1] : 'Live Preview';
+            const iconMatch = htmlCode.match(/<link[^>]+rel=["']icon["'][^>]+>/i);
+            
+            let favicon = "🌐";
+            
+            if (iconMatch) {
+                const hrefMatch = iconMatch[0].match(/href=["']([^"']+)["']/i);
+                if (hrefMatch) {
+                    favicon = `<img src="${hrefMatch[1]}" class="preview-favicon">`;
+                }
+            }
+
+            document.querySelector('.preview-header').innerHTML = `${favicon} ${title}`;
+            updateStatus('Code đã được chạy');
+        }
+
+        function clearEditor() {
+            if (confirm('Bạn có chắc muốn xóa toàn bộ code không?')) {
+                editors[currentTab].setValue('');
+                updateStatus('Editor đã được xóa');
+                runCode();
+            }
+        }
+
+        function downloadCode() {
+            const htmlCode = editors.html.getValue();
+            const cssCode = editors.css.getValue();
+            const jsCode = editors.js.getValue();
+
+            const fullCode = `${htmlCode}
+<style>
+${cssCode}
+</style>
+<script>
+${jsCode}
+<\/script>`;
+
+            const blob = new Blob([fullCode], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'my-website.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            updateStatus('File đã được tải xuống');
+        }
+
+        function updateStatus(message) {
+            const status = document.querySelector('.status');
+            status.textContent = message;
+            setTimeout(() => {
+                status.textContent = 'Sẵn sàng';
+            }, 2000);
+        }
+
+        function setup() {
+            const htmlSample = 
+`<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Project</title>
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/25/25231.png">
+</head>
+<body>
+    <h1>Hello World</h1>
+    <button id="change-color">Try change background color</button>
+</body>
+</html>`;
+
+            const cssSample = 
+`*{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+    
+body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    background: black;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: white;
+    transition: background 0.5s ease;
+}
+
+button {
+    padding: 10px 20px;
+    border: none;
+    background: #667eea;
+    color: white;
+    font-size: 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: background 0.3s ease;
+}
+
+button:hover {
+    background: #764ba2;
+    transform: scale(1.1);
+}`;
+
+            const jsSample = 
+`function getRandomGradient() {
+    const colors = [
+        'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+        'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+        'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+        'linear-gradient(135deg, #fa709a 0%, #fee140 100%)'
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+}
+
+document.getElementById('change-color').addEventListener('click', function() {
+    document.body.style.background = getRandomGradient();
+});`;
+
+            editors.html.setValue(htmlSample);
+            editors.css.setValue(cssSample);
+            editors.js.setValue(jsSample);
+
+            updateStatus("Đã nạp code mẫu. Bạn có thể viết tiếp!");
+        }
+
+        document.addEventListener('keydown', function (e) {
+            if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                downloadCode();
+            }
+            if (e.ctrlKey && e.key === 'Enter') {
+                e.preventDefault();
+                runCode();
+            }
+        });
+
+        document.addEventListener("DOMContentLoaded", () => {
+            initializeEditors();
+            setTimeout(() => {
+                setup();
+                runCode();
+            }, 100);
+        });
+    </script>
+</body>
+</html>
